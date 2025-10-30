@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Planning Poker</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        const POKER_VALUES = [
+          { value: '1', label: '1' },
+          { value: '2', label: '2' },
+          { value: '3', label: '3' },
+          { value: '5', label: '5' },
+          { value: '8', label: '8' },
+          { value: '13', label: '13' },
+          { value: '100', label: '100' },
+          { value: 'coffee', label: '☕', isCoffee: true }
+        ];
+
+        const TEAMS = {
+          'Ctrl Alt Defeat': [
+            'Amarjeet', 'Billi', 'Calder', 'Dannie', 'Jaysu', 'Josh', 'Mike', 'Peter', 'Yash'
+          ],
+          'Opti Pioneers': [
+            'Abhishek', 'Akila', 'Brandon', 'Dan', 'Dannie', 'Dave', 'Derek', 'Nikki', 'Prasanth', 'Renuga', 'Reyer', 'Yen'
+          ]
+        };
+
+        const Users = () => (
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+            <circle cx="9" cy="7" r="4"/>
+            <path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+          </svg>
+        );
+
+        const Eye = () => (
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+            <circle cx="12" cy="12" r="3"/>
+          </svg>
+        );
+
+        const EyeOff = () => (
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+            <line x1="1" y1="1" x2="23" y2="23"/>
+          </svg>
+        );
+
+        const RotateCcw = () => (
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="1 4 1 10 7 10"/>
+            <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
+          </svg>
+        );
+
+        const PaperWad = ({ startX, startY, targetX, targetY, onComplete }) => {
+          return (
+            <div
+              className="fixed pointer-events-none"
+              style={{
+                left: `${startX}px`,
+                top: `${startY}px`,
+                animation: `throw 0.8s ease-out forwards`,
+                '--target-x': `${targetX - startX}px`,
+                '--target-y': `${targetY - startY}px`,
+                fontSize: '32px',
+                zIndex: 1000
+              }}
+              onAnimationEnd={onComplete}
+            >
+              📄
+            </div>
+          );
+        };
+
+        function PlanningPoker() {
+          const [selectedTeam, setSelectedTeam] = useState('');
+          const [selectedMember, setSelectedMember] = useState('');
+          const [votes, setVotes] = useState({});
+          const [revealed, setRevealed] = useState(false);
+          const [paperWads, setPaperWads] = useState([]);
+          const [showRickRoll, setShowRickRoll] = useState(false);
+
+          const teamMembers = selectedTeam ? TEAMS[selectedTeam] : [];
+
+          useEffect(() => {
+            const style = document.createElement('style');
+            style.textContent = `
+              @keyframes throw {
+                0% {
+                  transform: translate(0, 0) rotate(0deg);
+                  opacity: 1;
+                }
+                100% {
+                  transform: translate(var(--target-x), var(--target-y)) rotate(720deg);
+                  opacity: 0;
+                }
+              }
+              @keyframes pulse {
+                0%, 100% { transform: scale(1); }
+                50% { transform: scale(1.05); }
+              }
+            `;
+            document.head.appendChild(style);
+            return () => document.head.removeChild(style);
+          }, []);
+
+          const handleVote = (value) => {
+            if (!selectedMember) return;
+            setVotes({ ...votes, [selectedMember]: value });
+          };
+
+          const handleReset = () => {
+            setVotes({});
+            setRevealed(false);
+          };
+
+          const handleTeamChange = (team) => {
+            setSelectedTeam(team);
+            setSelectedMember('');
+            setVotes({});
+            setRevealed(false);
+          };
+
+          const handleReveal = () => {
+            setRevealed(!revealed);
+          };
+
+          const throwPaper = (member, e) => {
+            const memberElement = document.getElementById(`member-${member}`);
+            const rect = memberElement.getBoundingClientRect();
+            
+            const targetX = rect.left + 80;
+            const targetY = rect.top + rect.height / 2;
+            
+            const startX = targetX < window.innerWidth / 2 
+              ? window.innerWidth - 100
+              : 100;
+            const startY = Math.random() * window.innerHeight * 0.3;
+            
+            const id = Date.now() + Math.random();
+            setPaperWads([...paperWads, {
+              id,
+              startX,
+              startY,
+              targetX,
+              targetY
+            }]);
+            setTimeout(() => {
+              setPaperWads(prev => prev.filter(w => w.id !== id));
+            }, 800);
+          };
+
+          const votedMembers = Object.keys(votes);
+          const waitingMembers = teamMembers.filter(m => !votes[m]);
+
+          return (
+            <div className="min-h-screen bg-gradient-to-br from-indigo-900 via-purple-900 to-pink-900 p-8">
+              {showRickRoll && (
+                <div 
+                  className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 backdrop-blur-sm"
+                  onClick={() => setShowRickRoll(false)}
+                >
+                  <div className="relative max-w-4xl p-4">
+                    <button
+                      onClick={() => setShowRickRoll(false)}
+                      className="absolute top-6 right-6 text-white text-4xl font-bold hover:text-red-500 transition-colors z-10"
+                    >
+                      ×
+                    </button>
+                    <div className="bg-gradient-to-br from-red-600 to-red-800 p-12 rounded-lg shadow-2xl text-center">
+                      <div className="text-white text-8xl mb-6 animate-bounce">🎵</div>
+                      <h1 className="text-white text-6xl font-bold mb-4" style={{textShadow: '4px 4px 8px rgba(0,0,0,0.5)'}}>
+                        YOU'VE BEEN
+                      </h1>
+                      <h1 className="text-white text-7xl font-bold mb-6" style={{textShadow: '4px 4px 8px rgba(0,0,0,0.5)'}}>
+                        RICK ROLLED
+                      </h1>
+                      <p className="text-white text-2xl italic mb-4">Never gonna give you up...</p>
+                      <p className="text-white text-2xl italic mb-4">Never gonna let you down...</p>
+                      <p className="text-white text-2xl italic">Never gonna run around and desert you...</p>
+                      <div className="text-white text-6xl mt-8">🕺</div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="max-w-6xl mx-auto">
+                <div className="flex justify-end mb-4">
+                  <button
+                    onClick={() => setShowRickRoll(true)}
+                    className="bg-cyan-400 hover:bg-cyan-500 text-gray-900 px-6 py-2 rounded-lg font-bold text-sm hover:shadow-lg transition-all"
+                  >
+                    💝 Donate
+                  </button>
+                </div>
+
+                <div className="text-center mb-8">
+                  <h1 className="text-5xl font-bold text-white mb-2 flex items-center justify-center gap-3">
+                    <Users />
+                    Planning Poker
+                  </h1>
+                  <p className="text-purple-200 text-lg mb-6">Vote together, decide together</p>
+                </div>
+
+                <div className="flex gap-4 justify-center mb-6">
+                  <button
+                    onClick={handleReveal}
+                    disabled={votedMembers.length === 0}
+                    className="flex items-center gap-2 bg-gradient-to-r from-pink-500 to-purple-600 text-white px-8 py-4 rounded-xl font-bold text-lg hover:shadow-2xl hover:scale-105 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                  >
+                    {revealed ? <EyeOff /> : <Eye />}
+                    {revealed ? 'Hide Votes' : 'Reveal Votes'}
+                  </button>
+                  <button
+                    onClick={handleReset}
+                    className="flex items-center gap-2 bg-white/20 backdrop-blur text-white px-8 py-4 rounded-xl font-bold text-lg hover:bg-white/30 hover:shadow-2xl hover:scale-105 transition-all border border-white/30"
+                  >
+                    <RotateCcw />
+                    New Round
+                  </button>
+                </div>
+
+                <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 mb-6 border border-white/20">
+                  <label className="block text-white text-lg font-semibold mb-3">
+                    Select Your Team
+                  </label>
+                  <select
+                    value={selectedTeam}
+                    onChange={(e) => handleTeamChange(e.target.value)}
+                    className="w-full p-4 rounded-xl bg-white/20 text-white border-2 border-white/30 text-lg font-medium focus:outline-none focus:border-pink-400 transition-all"
+                  >
+                    <option value="" className="bg-purple-900">Choose your team...</option>
+                    {Object.keys(TEAMS).map(team => (
+                      <option key={team} value={team} className="bg-purple-900">
+                        {team}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {selectedTeam && (
+                  <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 mb-6 border border-white/20">
+                    <label className="block text-white text-lg font-semibold mb-3">
+                      Select Your Name
+                    </label>
+                    <select
+                      value={selectedMember}
+                      onChange={(e) => setSelectedMember(e.target.value)}
+                      className="w-full p-4 rounded-xl bg-white/20 text-white border-2 border-white/30 text-lg font-medium focus:outline-none focus:border-pink-400 transition-all"
+                    >
+                      <option value="" className="bg-purple-900">Choose your name...</option>
+                      {teamMembers.map(member => (
+                        <option key={member} value={member} className="bg-purple-900">
+                          {member}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {selectedMember && (
+                  <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 mb-6 border border-white/20">
+                    <h2 className="text-white text-2xl font-bold mb-4">Cast Your Vote</h2>
+                    <div className="grid grid-cols-4 md:grid-cols-8 gap-3">
+                      {POKER_VALUES.map(({ value, label, isCoffee }) => (
+                        <button
+                          key={value}
+                          onClick={() => handleVote(value)}
+                          className={`aspect-[2/3] rounded-xl font-bold text-2xl transition-all transform hover:scale-110 hover:shadow-2xl ${
+                            votes[selectedMember] === value
+                              ? 'bg-gradient-to-br from-pink-500 to-purple-600 text-white scale-105 shadow-2xl ring-4 ring-white/50'
+                              : 'bg-white text-purple-900 hover:bg-pink-100'
+                          }`}
+                        >
+                          {isCoffee ? <span className="text-4xl">{label}</span> : label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="grid md:grid-cols-2 gap-6 mb-6">
+                  <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20">
+                    <h3 className="text-white text-xl font-bold mb-4 flex items-center gap-2">
+                      <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
+                      Voted ({votedMembers.length})
+                    </h3>
+                    <div className="space-y-2">
+                      {votedMembers.map(member => (
+                        <div
+                          key={member}
+                          className="bg-green-500/20 border border-green-400/50 rounded-lg p-3 flex items-center justify-between"
+                        >
+                          <span className="text-white font-medium">{member}</span>
+                          {revealed && (
+                            <span className="text-2xl font-bold text-green-300">
+                              {votes[member] === 'coffee' ? '☕' : votes[member]}
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20">
+                    <h3 className="text-white text-xl font-bold mb-4 flex items-center gap-2">
+                      <div className="w-3 h-3 bg-yellow-400 rounded-full" style={{ animation: 'pulse 1.5s ease-in-out infinite' }}></div>
+                      Waiting ({waitingMembers.length})
+                    </h3>
+                    <div className="space-y-2">
+                      {waitingMembers.map(member => (
+                        <div
+                          key={member}
+                          id={`member-${member}`}
+                          className="bg-yellow-500/20 border border-yellow-400/50 rounded-lg p-3 flex items-center justify-between group"
+                        >
+                          <span className="text-white font-medium">{member}</span>
+                          <button
+                            onClick={(e) => throwPaper(member, e)}
+                            className="opacity-0 group-hover:opacity-100 transition-opacity bg-white/20 hover:bg-white/30 text-white px-3 py-1 rounded-lg text-sm font-medium"
+                          >
+                            📄 Nudge
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {paperWads.map(wad => (
+                <PaperWad
+                  key={wad.id}
+                  startX={wad.startX}
+                  startY={wad.startY}
+                  targetX={wad.targetX}
+                  targetY={wad.targetY}
+                  onComplete={() => {}}
+                />
+              ))}
+            </div>
+          );
+        }
+
+        ReactDOM.render(<PlanningPoker />, document.getElementById('root'));
+    </script>
+</body>
+</html>
