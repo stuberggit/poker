@@ -122,6 +122,16 @@
             setVotes({ ...votes, [selectedMember]: value });
           };
 
+          const handleMemberSelect = (member) => {
+            setSelectedMember(member);
+            setTimeout(() => {
+              const votingSection = document.getElementById('voting-section');
+              if (votingSection) {
+                votingSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              }
+            }, 100);
+          };
+
           const handleReset = () => {
             setVotes({});
             setRevealed(false);
@@ -233,33 +243,34 @@
                   </button>
                 </div>
 
-                <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 mb-6 border border-white/20">
-                  <label className="block text-white text-lg font-semibold mb-3">
-                    Select Your Team
-                  </label>
-                  <select
-                    value={selectedTeam}
-                    onChange={(e) => handleTeamChange(e.target.value)}
-                    className="w-full p-4 rounded-xl bg-white/20 text-white border-2 border-white/30 text-lg font-medium focus:outline-none focus:border-pink-400 transition-all"
-                  >
-                    <option value="" className="bg-purple-900">Choose your team...</option>
-                    {Object.keys(TEAMS).map(team => (
-                      <option key={team} value={team} className="bg-purple-900">
-                        {team}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <div className="flex flex-wrap gap-4 mb-6">
+                  <div className="flex-1 min-w-[300px] bg-white/10 backdrop-blur-lg rounded-2xl p-4 border border-white/20">
+                    <label className="block text-white text-lg font-semibold mb-2">
+                      Select Your Team
+                    </label>
+                    <select
+                      value={selectedTeam}
+                      onChange={(e) => handleTeamChange(e.target.value)}
+                      className="w-full p-3 rounded-xl bg-white/20 text-white border-2 border-white/30 text-lg font-medium focus:outline-none focus:border-pink-400 transition-all"
+                    >
+                      <option value="" className="bg-purple-900">Choose your team...</option>
+                      {Object.keys(TEAMS).map(team => (
+                        <option key={team} value={team} className="bg-purple-900">
+                          {team}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
-                {selectedTeam && (
-                  <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 mb-6 border border-white/20">
-                    <label className="block text-white text-lg font-semibold mb-3">
+                  <div className="flex-1 min-w-[300px] bg-white/10 backdrop-blur-lg rounded-2xl p-4 border border-white/20">
+                    <label className="block text-white text-lg font-semibold mb-2">
                       Select Your Name
                     </label>
                     <select
                       value={selectedMember}
-                      onChange={(e) => setSelectedMember(e.target.value)}
-                      className="w-full p-4 rounded-xl bg-white/20 text-white border-2 border-white/30 text-lg font-medium focus:outline-none focus:border-pink-400 transition-all"
+                      onChange={(e) => handleMemberSelect(e.target.value)}
+                      disabled={!selectedTeam}
+                      className="w-full p-3 rounded-xl bg-white/20 text-white border-2 border-white/30 text-lg font-medium focus:outline-none focus:border-pink-400 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <option value="" className="bg-purple-900">Choose your name...</option>
                       {teamMembers.map(member => (
@@ -269,12 +280,12 @@
                       ))}
                     </select>
                   </div>
-                )}
+                </div>
 
                 {selectedMember && (
-                  <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 mb-6 border border-white/20">
-                    <h2 className="text-white text-2xl font-bold mb-4">Cast Your Vote</h2>
-                    <div className="grid grid-cols-4 md:grid-cols-8 gap-3">
+                  <div id="voting-section" className="bg-white/10 backdrop-blur-lg rounded-2xl p-5 mb-6 border border-white/20">
+                    <h2 className="text-white text-2xl font-bold mb-3">Cast Your Vote</h2>
+                    <div className="grid grid-cols-4 md:grid-cols-8 gap-2">
                       {POKER_VALUES.map(({ value, label, isCoffee }) => (
                         <button
                           key={value}
@@ -302,7 +313,7 @@
                       {votedMembers.map(member => (
                         <div
                           key={member}
-                          className="bg-green-500/20 border border-green-400/50 rounded-lg p-3 flex items-center justify-between"
+                          className="bg-green-500/20 border border-green-400/50 rounded-lg p-2 flex items-center justify-between"
                         >
                           <span className="text-white font-medium">{member}</span>
                           {revealed && (
@@ -325,7 +336,7 @@
                         <div
                           key={member}
                           id={`member-${member}`}
-                          className="bg-yellow-500/20 border border-yellow-400/50 rounded-lg p-3 flex items-center justify-between group"
+                          className="bg-yellow-500/20 border border-yellow-400/50 rounded-lg p-2 flex items-center justify-between group"
                         >
                           <span className="text-white font-medium">{member}</span>
                           <button
