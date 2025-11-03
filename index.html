@@ -31,7 +31,7 @@
             'Amarjeet', 'Billi', 'Calder', 'Dannie', 'Jaysu', 'Josh', 'Mike', 'Peter', 'Yash'
           ],
           'Opti Pioneers': [
-            'Abhishek', 'Akila', 'Brandon', 'Dan', 'Dannie', 'Dave', 'Derek', 'Nikki', 'Pat', 'Prasanth', 'Renuga', 'Reyer', 'Yen'
+            'Abhishek', 'Akila', 'Brandon', 'Dan', 'Dannie', 'Dave', 'Derek', 'Nikki', 'Prasanth', 'Renuga', 'Reyer', 'Yen'
           ]
         };
 
@@ -119,10 +119,18 @@
 
           const handleVote = (value) => {
             if (!selectedMember) return;
-            setVotes({ ...votes, [selectedMember]: value });
+            const newVotes = { ...votes, [selectedMember]: value };
+            setVotes(newVotes);
           };
 
           const handleMemberSelect = (member) => {
+            const userHasVoted = selectedMember && votes[selectedMember] !== undefined;
+            
+            if (userHasVoted) {
+              alert('You have already voted! Click "New Round" to vote again.');
+              return;
+            }
+            
             setSelectedMember(member);
             setTimeout(() => {
               const votingSection = document.getElementById('voting-section');
@@ -135,9 +143,17 @@
           const handleReset = () => {
             setVotes({});
             setRevealed(false);
+            setSelectedMember('');
           };
 
           const handleTeamChange = (team) => {
+            const userHasVoted = selectedMember && votes[selectedMember] !== undefined;
+            
+            if (userHasVoted) {
+              alert('You have already voted! Click "New Round" to change teams.');
+              return;
+            }
+            
             setSelectedTeam(team);
             setSelectedMember('');
             setVotes({});
@@ -175,6 +191,7 @@
 
           const votedMembers = Object.keys(votes);
           const waitingMembers = teamMembers.filter(m => !votes[m]);
+          const userHasVoted = selectedMember && votes[selectedMember] !== undefined;
 
           return (
             <div className="min-h-screen bg-gradient-to-br from-indigo-900 via-purple-900 to-pink-900 p-8">
@@ -246,12 +263,19 @@
                 <div className="flex flex-wrap gap-4 mb-6">
                   <div className="flex-1 min-w-[300px] bg-white/10 backdrop-blur-lg rounded-2xl p-4 border border-white/20">
                     <label className="block text-white text-lg font-semibold mb-2">
-                      Select Your Team
+                      Select Your Team {userHasVoted ? '🔒' : ''}
                     </label>
                     <select
                       value={selectedTeam}
-                      onChange={(e) => handleTeamChange(e.target.value)}
+                      onChange={(e) => {
+                        if (userHasVoted) {
+                          alert('You already voted! Click "New Round" to start over.');
+                          return;
+                        }
+                        handleTeamChange(e.target.value);
+                      }}
                       className="w-full p-3 rounded-xl bg-white/20 text-white border-2 border-white/30 text-lg font-medium focus:outline-none focus:border-pink-400 transition-all"
+                      style={userHasVoted ? {opacity: 0.5, pointerEvents: 'none', cursor: 'not-allowed'} : {}}
                     >
                       <option value="" className="bg-purple-900">Choose your team...</option>
                       {Object.keys(TEAMS).map(team => (
@@ -264,13 +288,20 @@
 
                   <div className="flex-1 min-w-[300px] bg-white/10 backdrop-blur-lg rounded-2xl p-4 border border-white/20">
                     <label className="block text-white text-lg font-semibold mb-2">
-                      Select Your Name
+                      Select Your Name {userHasVoted ? '🔒' : ''}
                     </label>
                     <select
                       value={selectedMember}
-                      onChange={(e) => handleMemberSelect(e.target.value)}
+                      onChange={(e) => {
+                        if (userHasVoted) {
+                          alert('You already voted! Click "New Round" to start over.');
+                          return;
+                        }
+                        handleMemberSelect(e.target.value);
+                      }}
                       disabled={!selectedTeam}
                       className="w-full p-3 rounded-xl bg-white/20 text-white border-2 border-white/30 text-lg font-medium focus:outline-none focus:border-pink-400 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                      style={userHasVoted ? {opacity: 0.5, pointerEvents: 'none', cursor: 'not-allowed'} : {}}
                     >
                       <option value="" className="bg-purple-900">Choose your name...</option>
                       {teamMembers.map(member => (
@@ -279,6 +310,9 @@
                         </option>
                       ))}
                     </select>
+                    {userHasVoted && (
+                      <p className="text-green-300 text-sm mt-2">✓ Vote locked in</p>
+                    )}
                   </div>
                 </div>
 
