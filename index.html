@@ -92,6 +92,9 @@
           const [revealed, setRevealed] = useState(false);
           const [paperWads, setPaperWads] = useState([]);
           const [showRickRoll, setShowRickRoll] = useState(false);
+          const [customName, setCustomName] = useState('');
+          const [showCustomInput, setShowCustomInput] = useState(false);
+          const [activePlayers, setActivePlayers] = useState(new Set());
 
           const teamMembers = selectedTeam ? TEAMS[selectedTeam] : [];
 
@@ -130,8 +133,17 @@
               alert('You have already voted! Click "New Round" to vote again.');
               return;
             }
+
+            if (member === 'OTHER') {
+              setShowCustomInput(true);
+              setSelectedMember('');
+              return;
+            }
             
+            setShowCustomInput(false);
             setSelectedMember(member);
+            setActivePlayers(prev => new Set([...prev, member]));
+            
             setTimeout(() => {
               const votingSection = document.getElementById('voting-section');
               if (votingSection) {
@@ -140,10 +152,27 @@
             }, 100);
           };
 
+          const handleCustomNameSubmit = () => {
+            if (customName.trim()) {
+              setSelectedMember(customName.trim());
+              setActivePlayers(prev => new Set([...prev, customName.trim()]));
+              setShowCustomInput(false);
+              setTimeout(() => {
+                const votingSection = document.getElementById('voting-section');
+                if (votingSection) {
+                  votingSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+              }, 100);
+            }
+          };
+
           const handleReset = () => {
             setVotes({});
             setRevealed(false);
             setSelectedMember('');
+            setCustomName('');
+            setShowCustomInput(false);
+            setActivePlayers(new Set());
           };
 
           const handleTeamChange = (team) => {
@@ -158,6 +187,9 @@
             setSelectedMember('');
             setVotes({});
             setRevealed(false);
+            setCustomName('');
+            setShowCustomInput(false);
+            setActivePlayers(new Set());
           };
 
           const handleReveal = () => {
@@ -189,8 +221,9 @@
             }, 800);
           };
 
-          const votedMembers = Object.keys(votes);
-          const waitingMembers = teamMembers.filter(m => !votes[m]);
+          const votedMembers = Object.keys(votes).sort();
+          const allParticipants = [...new Set([...teamMembers, ...Array.from(activePlayers)])].sort();
+          const waitingMembers = allParticipants.filter(m => !votes[m]);
           const userHasVoted = selectedMember && votes[selectedMember] !== undefined;
 
           return (
@@ -291,7 +324,7 @@
                       Select Your Name {userHasVoted ? '🔒' : ''}
                     </label>
                     <select
-                      value={selectedMember}
+                      value={showCustomInput ? 'OTHER' : selectedMember}
                       onChange={(e) => {
                         if (userHasVoted) {
                           alert('You already voted! Click "New Round" to start over.');
@@ -309,7 +342,27 @@
                           {member}
                         </option>
                       ))}
+                      <option value="OTHER" className="bg-purple-900">Other (Custom Name)</option>
                     </select>
+                    {showCustomInput && (
+                      <div className="mt-3">
+                        <input
+                          type="text"
+                          value={customName}
+                          onChange={(e) => setCustomName(e.target.value)}
+                          onKeyPress={(e) => e.key === 'Enter' && handleCustomNameSubmit()}
+                          placeholder="Enter your name..."
+                          className="w-full p-3 rounded-xl bg-white/20 text-white border-2 border-pink-400 text-lg font-medium focus:outline-none placeholder-purple-300"
+                          autoFocus
+                        />
+                        <button
+                          onClick={handleCustomNameSubmit}
+                          className="mt-2 w-full bg-gradient-to-r from-pink-500 to-purple-600 text-white px-4 py-2 rounded-lg font-bold hover:shadow-lg transition-all"
+                        >
+                          Confirm Name
+                        </button>
+                      </div>
+                    )}
                     {userHasVoted && (
                       <p className="text-green-300 text-sm mt-2">✓ Vote locked in</p>
                     )}
@@ -366,21 +419,27 @@
                       Waiting ({waitingMembers.length})
                     </h3>
                     <div className="space-y-2">
-                      {waitingMembers.map(member => (
-                        <div
-                          key={member}
-                          id={`member-${member}`}
-                          className="bg-yellow-500/20 border border-yellow-400/50 rounded-lg p-2 flex items-center justify-between group"
-                        >
-                          <span className="text-white font-medium">{member}</span>
-                          <button
-                            onClick={(e) => throwPaper(member, e)}
-                            className="opacity-0 group-hover:opacity-100 transition-opacity bg-white/20 hover:bg-white/30 text-white px-3 py-1 rounded-lg text-sm font-medium"
+                      {waitingMembers.map(member => {
+                        const isActive = activePlayers.has(member);
+                        return (
+                          <div
+                            key={member}
+                            id={`member-${member}`}
+                            className="bg-yellow-500/20 border border-yellow-400/50 rounded-lg p-2 flex items-center justify-between group"
                           >
-                            📄 Nudge
-                          </button>
-                        </div>
-                      ))}
+                            <span className="text-white font-medium flex items-center gap-2">
+                              <span className={`w-2 h-2 rounded-full ${isActive ? 'bg-green-400 animate-pulse' : 'bg-gray-500'}`}></span>
+                              {member}
+                            </span>
+                            <button
+                              onClick={(e) => throwPaper(member, e)}
+                              className="opacity-0 group-hover:opacity-100 transition-opacity bg-white/20 hover:bg-white/30 text-white px-3 py-1 rounded-lg text-sm font-medium"
+                            >
+                              📄 Nudge
+                            </button>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
