@@ -142,7 +142,7 @@
             
             setShowCustomInput(false);
             setSelectedMember(member);
-            setActivePlayers(prev => new Set([...prev, member]));
+            setActivePlayers(new Set([member]));
             
             setTimeout(() => {
               const votingSection = document.getElementById('voting-section');
@@ -155,7 +155,7 @@
           const handleCustomNameSubmit = () => {
             if (customName.trim()) {
               setSelectedMember(customName.trim());
-              setActivePlayers(prev => new Set([...prev, customName.trim()]));
+              setActivePlayers(new Set([customName.trim()]));
               setShowCustomInput(false);
               setTimeout(() => {
                 const votingSection = document.getElementById('voting-section');
