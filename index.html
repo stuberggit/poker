@@ -8,12 +8,30 @@
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
 </head>
 <body>
     <div id="root"></div>
 
     <script type="text/babel">
         const { useState, useEffect } = React;
+
+        // Firebase configuration
+        const firebaseConfig = {
+          apiKey: "AIzaSyCbDfcFE5IWOG8tuauHfDTYo4eTq9KxjpU",
+          authDomain: "poker-72b01.firebaseapp.com",
+          databaseURL: "https://poker-72b01-default-rtdb.firebaseio.com",
+          projectId: "poker-72b01",
+          storageBucket: "poker-72b01.firebasestorage.app",
+          messagingSenderId: "205381323344",
+          appId: "1:205381323344:web:88de0adcb174d978bf5f55",
+          measurementId: "G-H1TE32ZWHD"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
 
         const POKER_VALUES = [
           { value: '1', label: '1' },
@@ -86,6 +104,8 @@
         };
 
         function PlanningPoker() {
+          const [sessionId, setSessionId] = useState('');
+          const [showSessionInput, setShowSessionInput] = useState(true);
           const [selectedTeam, setSelectedTeam] = useState('');
           const [selectedMember, setSelectedMember] = useState('');
           const [votes, setVotes] = useState({});
@@ -94,7 +114,7 @@
           const [showRickRoll, setShowRickRoll] = useState(false);
           const [customName, setCustomName] = useState('');
           const [showCustomInput, setShowCustomInput] = useState(false);
-          const [activePlayers, setActivePlayers] = useState(new Set());
+          const [activePlayers, setActivePlayers] = useState({});
 
           const teamMembers = selectedTeam ? TEAMS[selectedTeam] : [];
 
@@ -120,10 +140,44 @@
             return () => document.head.removeChild(style);
           }, []);
 
+          // Subscribe to Firebase data
+          useEffect(() => {
+            if (!sessionId) return;
+
+            const sessionRef = database.ref(`sessions/${sessionId}`);
+            
+            const votesRef = sessionRef.child('votes');
+            const revealedRef = sessionRef.child('revealed');
+            const activePlayersRef = sessionRef.child('activePlayers');
+
+            const votesListener = votesRef.on('value', (snapshot) => {
+              setVotes(snapshot.val() || {});
+            });
+
+            const revealedListener = revealedRef.on('value', (snapshot) => {
+              setRevealed(snapshot.val() || false);
+            });
+
+            const activePlayersListener = activePlayersRef.on('value', (snapshot) => {
+              setActivePlayers(snapshot.val() || {});
+            });
+
+            return () => {
+              votesRef.off('value', votesListener);
+              revealedRef.off('value', revealedListener);
+              activePlayersRef.off('value', activePlayersListener);
+            };
+          }, [sessionId]);
+
+          const joinSession = () => {
+            if (sessionId.trim()) {
+              setShowSessionInput(false);
+            }
+          };
+
           const handleVote = (value) => {
-            if (!selectedMember) return;
-            const newVotes = { ...votes, [selectedMember]: value };
-            setVotes(newVotes);
+            if (!selectedMember || !sessionId) return;
+            database.ref(`sessions/${sessionId}/votes/${selectedMember}`).set(value);
           };
 
           const handleMemberSelect = (member) => {
@@ -142,7 +196,10 @@
             
             setShowCustomInput(false);
             setSelectedMember(member);
-            setActivePlayers(new Set([member]));
+            
+            if (sessionId) {
+              database.ref(`sessions/${sessionId}/activePlayers/${member}`).set(true);
+            }
             
             setTimeout(() => {
               const votingSection = document.getElementById('voting-section');
@@ -155,7 +212,11 @@
           const handleCustomNameSubmit = () => {
             if (customName.trim()) {
               setSelectedMember(customName.trim());
-              setActivePlayers(new Set([customName.trim()]));
+              
+              if (sessionId) {
+                database.ref(`sessions/${sessionId}/activePlayers/${customName.trim()}`).set(true);
+              }
+              
               setShowCustomInput(false);
               setTimeout(() => {
                 const votingSection = document.getElementById('voting-section');
@@ -167,12 +228,16 @@
           };
 
           const handleReset = () => {
-            setVotes({});
-            setRevealed(false);
+            if (sessionId) {
+              database.ref(`sessions/${sessionId}`).set({
+                votes: {},
+                revealed: false,
+                activePlayers: {}
+              });
+            }
             setSelectedMember('');
             setCustomName('');
             setShowCustomInput(false);
-            setActivePlayers(new Set());
           };
 
           const handleTeamChange = (team) => {
@@ -185,15 +250,14 @@
             
             setSelectedTeam(team);
             setSelectedMember('');
-            setVotes({});
-            setRevealed(false);
             setCustomName('');
             setShowCustomInput(false);
-            setActivePlayers(new Set());
           };
 
           const handleReveal = () => {
-            setRevealed(!revealed);
+            if (sessionId) {
+              database.ref(`sessions/${sessionId}/revealed`).set(!revealed);
+            }
           };
 
           const throwPaper = (member, e) => {
@@ -222,9 +286,39 @@
           };
 
           const votedMembers = Object.keys(votes).sort();
-          const allParticipants = [...new Set([...teamMembers, ...Array.from(activePlayers)])].sort();
+          const allParticipants = [...new Set([...teamMembers, ...Object.keys(activePlayers)])].sort();
           const waitingMembers = allParticipants.filter(m => !votes[m]);
           const userHasVoted = selectedMember && votes[selectedMember] !== undefined;
+
+          if (showSessionInput) {
+            return (
+              <div className="min-h-screen bg-gradient-to-br from-indigo-900 via-purple-900 to-pink-900 p-8 flex items-center justify-center">
+                <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-8 border border-white/20 max-w-md w-full">
+                  <h1 className="text-4xl font-bold text-white mb-4 text-center">Planning Poker</h1>
+                  <p className="text-purple-200 mb-6 text-center">Enter a session ID to join or create a new session</p>
+                  <input
+                    type="text"
+                    value={sessionId}
+                    onChange={(e) => setSessionId(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && joinSession()}
+                    placeholder="Session ID (e.g., sprint-planning-123)"
+                    className="w-full p-4 rounded-xl bg-white/20 text-white border-2 border-white/30 text-lg font-medium focus:outline-none focus:border-pink-400 mb-4 placeholder-purple-300"
+                    autoFocus
+                  />
+                  <button
+                    onClick={joinSession}
+                    disabled={!sessionId.trim()}
+                    className="w-full bg-gradient-to-r from-pink-500 to-purple-600 text-white px-6 py-4 rounded-xl font-bold text-lg hover:shadow-2xl hover:scale-105 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Join Session
+                  </button>
+                  <p className="text-purple-300 text-sm mt-4 text-center">
+                    💡 Tip: Share the same session ID with your team to vote together!
+                  </p>
+                </div>
+              </div>
+            );
+          }
 
           return (
             <div className="min-h-screen bg-gradient-to-br from-indigo-900 via-purple-900 to-pink-900 p-8">
@@ -258,7 +352,11 @@
               )}
 
               <div className="max-w-6xl mx-auto">
-                <div className="flex justify-end mb-4">
+                <div className="flex justify-between items-center mb-4">
+                  <div className="text-white">
+                    <span className="text-sm opacity-75">Session: </span>
+                    <span className="font-bold">{sessionId}</span>
+                  </div>
                   <button
                     onClick={() => setShowRickRoll(true)}
                     className="bg-cyan-400 hover:bg-cyan-500 text-gray-900 px-6 py-2 rounded-lg font-bold text-sm hover:shadow-lg transition-all"
@@ -420,7 +518,7 @@
                     </h3>
                     <div className="space-y-2">
                       {waitingMembers.map(member => {
-                        const isActive = activePlayers.has(member);
+                        const isActive = activePlayers[member];
                         return (
                           <div
                             key={member}
