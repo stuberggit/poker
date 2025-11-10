@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Planning Poker</title>
+    <title>Planning Poker - v2024.11.11</title>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -188,19 +188,19 @@
               return;
             }
 
+            // ALWAYS clear previous selection first, regardless of what's being selected
+            if (selectedMember && sessionId) {
+              database.ref(`sessions/${sessionId}/activePlayers/${selectedMember}`).remove();
+            }
+
             if (member === 'OTHER') {
               setShowCustomInput(true);
               setSelectedMember('');
+              // Don't set any active player when showing custom input
               return;
             }
             
             setShowCustomInput(false);
-            
-            // Clear previous selection if there was one
-            if (selectedMember && sessionId) {
-              database.ref(`sessions/${sessionId}/activePlayers/${selectedMember}`).remove();
-            }
-            
             setSelectedMember(member);
             
             if (sessionId) {
@@ -222,13 +222,16 @@
                 database.ref(`sessions/${sessionId}/activePlayers/${selectedMember}`).remove();
               }
               
-              setSelectedMember(customName.trim());
+              const trimmedName = customName.trim();
+              setSelectedMember(trimmedName);
               
               if (sessionId) {
-                database.ref(`sessions/${sessionId}/activePlayers/${customName.trim()}`).set(true);
+                database.ref(`sessions/${sessionId}/activePlayers/${trimmedName}`).set(true);
               }
               
               setShowCustomInput(false);
+              setCustomName('');
+              
               setTimeout(() => {
                 const votingSection = document.getElementById('voting-section');
                 if (votingSection) {
@@ -296,8 +299,10 @@
             }, 800);
           };
 
-          const votedMembers = Object.keys(votes).sort();
-          const allParticipants = [...new Set([...teamMembers, ...Object.keys(activePlayers)])].sort();
+          // Sort everything alphabetically using localeCompare for reliability
+          const votedMembers = Object.keys(votes).sort((a, b) => a.localeCompare(b));
+          const activePlayersList = Object.keys(activePlayers);
+          const allParticipants = [...new Set([...teamMembers, ...activePlayersList])].sort((a, b) => a.localeCompare(b));
           const waitingMembers = allParticipants.filter(m => !votes[m]);
           const userHasVoted = selectedMember && votes[selectedMember] !== undefined;
 
