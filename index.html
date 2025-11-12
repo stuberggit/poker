@@ -83,6 +83,13 @@
           </svg>
         );
 
+        const Copy = () => (
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+          </svg>
+        );
+
         const PaperWad = ({ startX, startY, targetX, targetY, onComplete }) => {
           return (
             <div
@@ -106,6 +113,8 @@
         function PlanningPoker() {
           const [sessionId, setSessionId] = useState('');
           const [showSessionInput, setShowSessionInput] = useState(true);
+          const [showCreateSession, setShowCreateSession] = useState(false);
+          const [createSessionTeam, setCreateSessionTeam] = useState('');
           const [selectedTeam, setSelectedTeam] = useState('');
           const [selectedMember, setSelectedMember] = useState('');
           const [votes, setVotes] = useState({});
@@ -115,6 +124,7 @@
           const [customName, setCustomName] = useState('');
           const [showCustomInput, setShowCustomInput] = useState(false);
           const [activePlayers, setActivePlayers] = useState({});
+          const [copied, setCopied] = useState(false);
 
           const teamMembers = selectedTeam ? TEAMS[selectedTeam] : [];
 
@@ -139,6 +149,20 @@
             document.head.appendChild(style);
             return () => document.head.removeChild(style);
           }, []);
+
+          // Warn before leaving if user has joined a session
+          useEffect(() => {
+            const handleBeforeUnload = (e) => {
+              if (selectedMember && sessionId) {
+                e.preventDefault();
+                e.returnValue = 'Active session in progress. Are you sure you want to leave?';
+                return e.returnValue;
+              }
+            };
+
+            window.addEventListener('beforeunload', handleBeforeUnload);
+            return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+          }, [selectedMember, sessionId]);
 
           // Subscribe to Firebase data
           useEffect(() => {
@@ -169,10 +193,33 @@
             };
           }, [sessionId]);
 
+          const generateSessionId = (team) => {
+            const date = new Date();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            const teamSlug = team.toLowerCase().replace(/\s+/g, '-');
+            return `${teamSlug}-${month}-${day}`;
+          };
+
+          const handleCreateSession = () => {
+            if (!createSessionTeam) return;
+            const newSessionId = generateSessionId(createSessionTeam);
+            setSessionId(newSessionId);
+            setSelectedTeam(createSessionTeam);
+            setShowCreateSession(false);
+            setShowSessionInput(false);
+          };
+
           const joinSession = () => {
             if (sessionId.trim()) {
               setShowSessionInput(false);
             }
+          };
+
+          const copySessionId = () => {
+            navigator.clipboard.writeText(sessionId);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
           };
 
           const handleVote = (value) => {
@@ -188,7 +235,6 @@
               return;
             }
 
-            // ALWAYS clear previous selection first, regardless of what's being selected
             if (selectedMember && sessionId) {
               database.ref(`sessions/${sessionId}/activePlayers/${selectedMember}`).remove();
             }
@@ -196,7 +242,6 @@
             if (member === 'OTHER') {
               setShowCustomInput(true);
               setSelectedMember('');
-              // Don't set any active player when showing custom input
               return;
             }
             
@@ -217,7 +262,6 @@
 
           const handleCustomNameSubmit = () => {
             if (customName.trim()) {
-              // Clear previous selection if there was one
               if (selectedMember && sessionId) {
                 database.ref(`sessions/${sessionId}/activePlayers/${selectedMember}`).remove();
               }
@@ -299,38 +343,109 @@
             }, 800);
           };
 
-          // Sort everything alphabetically using localeCompare for reliability
           const votedMembers = Object.keys(votes).sort((a, b) => a.localeCompare(b));
           const activePlayersList = Object.keys(activePlayers);
           const allParticipants = [...new Set([...teamMembers, ...activePlayersList])].sort((a, b) => a.localeCompare(b));
           const waitingMembers = allParticipants.filter(m => !votes[m]);
           const userHasVoted = selectedMember && votes[selectedMember] !== undefined;
 
+          // Session creation screen
+          if (showCreateSession) {
+            return (
+              <div className="min-h-screen bg-gradient-to-br from-indigo-900 via-purple-900 to-pink-900 p-8 flex items-center justify-center">
+                <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-8 border border-white/20 max-w-md w-full">
+                  <h1 className="text-4xl font-bold text-white mb-4 text-center">Create New Session</h1>
+                  <p className="text-purple-200 mb-6 text-center">Select your team to auto-generate a session ID</p>
+                  
+                  <div className="mb-6">
+                    <label className="block text-white text-lg font-semibold mb-3">Select Team</label>
+                    {Object.keys(TEAMS).map(team => (
+                      <button
+                        key={team}
+                        onClick={() => setCreateSessionTeam(team)}
+                        className={`w-full mb-3 p-4 rounded-xl font-bold text-lg transition-all ${
+                          createSessionTeam === team
+                            ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white'
+                            : 'bg-white/20 text-white hover:bg-white/30'
+                        }`}
+                      >
+                        {team}
+                      </button>
+                    ))}
+                  </div>
+
+                  {createSessionTeam && (
+                    <div className="mb-6 p-4 bg-green-500/20 border border-green-400/50 rounded-xl">
+                      <p className="text-green-300 text-sm mb-2">Your session ID will be:</p>
+                      <p className="text-white font-mono text-lg font-bold">{generateSessionId(createSessionTeam)}</p>
+                    </div>
+                  )}
+
+                  <button
+                    onClick={handleCreateSession}
+                    disabled={!createSessionTeam}
+                    className="w-full bg-gradient-to-r from-pink-500 to-purple-600 text-white px-6 py-4 rounded-xl font-bold text-lg hover:shadow-2xl hover:scale-105 transition-all disabled:opacity-50 disabled:cursor-not-allowed mb-3"
+                  >
+                    Create Session
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setShowCreateSession(false);
+                      setCreateSessionTeam('');
+                    }}
+                    className="w-full bg-white/20 text-white px-6 py-3 rounded-xl font-bold hover:bg-white/30 transition-all"
+                  >
+                    Back
+                  </button>
+                </div>
+              </div>
+            );
+          }
+
+          // Initial session selection screen
           if (showSessionInput) {
             return (
               <div className="min-h-screen bg-gradient-to-br from-indigo-900 via-purple-900 to-pink-900 p-8 flex items-center justify-center">
                 <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-8 border border-white/20 max-w-md w-full">
                   <h1 className="text-4xl font-bold text-white mb-4 text-center">Planning Poker</h1>
-                  <p className="text-purple-200 mb-6 text-center">Enter a session ID to join or create a new session</p>
-                  <input
-                    type="text"
-                    value={sessionId}
-                    onChange={(e) => setSessionId(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && joinSession()}
-                    placeholder="Session ID (e.g., sprint-planning-123)"
-                    className="w-full p-4 rounded-xl bg-white/20 text-white border-2 border-white/30 text-lg font-medium focus:outline-none focus:border-pink-400 mb-4 placeholder-purple-300"
-                    autoFocus
-                  />
+                  <p className="text-purple-200 mb-6 text-center">Create a new session or join an existing one</p>
+                  
+                  <button
+                    onClick={() => setShowCreateSession(true)}
+                    className="w-full bg-gradient-to-r from-pink-500 to-purple-600 text-white px-6 py-4 rounded-xl font-bold text-lg hover:shadow-2xl hover:scale-105 transition-all mb-4"
+                  >
+                    🆕 Create New Session
+                  </button>
+
+                  <div className="relative mb-4">
+                    <div className="absolute inset-0 flex items-center">
+                      <div className="w-full border-t border-white/30"></div>
+                    </div>
+                    <div className="relative flex justify-center text-sm">
+                      <span className="px-4 bg-transparent text-purple-200">or</span>
+                    </div>
+                  </div>
+
+                  <div className="mb-4">
+                    <label className="block text-white text-sm font-semibold mb-2">Join Existing Session</label>
+                    <input
+                      type="text"
+                      value={sessionId}
+                      onChange={(e) => setSessionId(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && joinSession()}
+                      placeholder="Enter session ID"
+                      className="w-full p-4 rounded-xl bg-white/20 text-white border-2 border-white/30 text-lg font-medium focus:outline-none focus:border-pink-400 placeholder-purple-300"
+                    />
+                  </div>
+
                   <button
                     onClick={joinSession}
                     disabled={!sessionId.trim()}
-                    className="w-full bg-gradient-to-r from-pink-500 to-purple-600 text-white px-6 py-4 rounded-xl font-bold text-lg hover:shadow-2xl hover:scale-105 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full bg-white/20 backdrop-blur text-white px-6 py-4 rounded-xl font-bold text-lg hover:bg-white/30 hover:shadow-2xl transition-all disabled:opacity-50 disabled:cursor-not-allowed border border-white/30"
                   >
                     Join Session
                   </button>
-                  <p className="text-purple-300 text-sm mt-4 text-center">
-                    💡 Tip: Share the same session ID with your team to vote together!
-                  </p>
                 </div>
               </div>
             );
@@ -369,9 +484,19 @@
 
               <div className="max-w-6xl mx-auto">
                 <div className="flex justify-between items-center mb-4">
-                  <div className="text-white">
-                    <span className="text-sm opacity-75">Session: </span>
-                    <span className="font-bold">{sessionId}</span>
+                  <div className="flex items-center gap-3">
+                    <div className="text-white">
+                      <span className="text-sm opacity-75">Session: </span>
+                      <span className="font-bold font-mono">{sessionId}</span>
+                    </div>
+                    <button
+                      onClick={copySessionId}
+                      className="flex items-center gap-2 bg-white/20 hover:bg-white/30 text-white px-3 py-1 rounded-lg text-sm font-medium transition-all"
+                      title="Copy session ID"
+                    >
+                      <Copy />
+                      {copied ? 'Copied!' : 'Copy'}
+                    </button>
                   </div>
                   <button
                     onClick={() => setShowRickRoll(true)}
